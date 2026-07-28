@@ -1,0 +1,16 @@
+# Скомпилированные бинарники
+*.exe
+*.dll
+password-manager
+
+# Логи и тестовые данные организатора
+*.log
+test_files/
+
+# Папки IDE
+.idea/
+.vscode/
+
+# Временные файлы
+*.tmp
+.DS_Store
