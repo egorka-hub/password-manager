@@ -77,6 +77,16 @@ func (pm *PasswordManager) GetPassword(name string) (Password, error) {
 	return p, nil
 }
 
+func (pm *PasswordManager) ListPasswords() []Password {
+	result := make([]Password, 0, len(pm.passwords))
+
+	for _, v := range pm.passwords {
+		result = append(result, v)
+	}
+
+	return result
+}
+
 func main() {
 	pm := NewPasswordManager("passwords.dat")
 
@@ -92,4 +102,13 @@ func main() {
 
 	found, _ := pm.GetPassword("github.com")
 	fmt.Printf("Found password: %+v\n", found)
+
+	pm.SavePassword("gmail.com", "MyPassword456", "email")
+	pm.SavePassword("netflix.com", "MyPassword789", "entertainment")
+
+	list := pm.ListPasswords()
+	fmt.Printf("\nTotal passwords: %d\n\n", len(list))
+	for _, p := range list {
+		fmt.Printf("Service: %-15s Category: %s\n", p.Name, p.Category)
+	}
 }
