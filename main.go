@@ -38,10 +38,26 @@ func NewPasswordManager(filePath string) *PasswordManager {
 	}
 }
 
+func (pm *PasswordManager) SetMasterPassword(masterPassword string) error {
+	if len(masterPassword) < 8 {
+		return fmt.Errorf("password is too weak")
+	}
+	pm.masterKey = make([]byte, 32)
+	copy(pm.masterKey, masterPassword)
+	pm.isInitialized = true
+
+	return nil
+}
+
 func main() {
 	pm := NewPasswordManager("passwords.dat")
 
-	fmt.Printf("Initialized: %v\n", pm.isInitialized)
-	fmt.Printf("File path: %s\n", pm.filePath)
-	fmt.Printf("Passwords count: %d\n", len(pm.passwords))
+	weakErr := pm.SetMasterPassword("short")
+	fmt.Printf("Weak master password: %v\n", weakErr)
+
+	strongErr := pm.SetMasterPassword("BatteryStaple")
+	fmt.Printf("Strong master password: %v\n", strongErr)
+
+	fmt.Printf("Manager initialized: %v\n", pm.isInitialized)
+	fmt.Printf("Master key length: %d\n", len(pm.masterKey))
 }
