@@ -65,17 +65,31 @@ func (pm *PasswordManager) SavePassword(name, value, category string) error {
 	return nil
 }
 
+func (pm *PasswordManager) GetPassword(name string) (Password, error) {
+	if !pm.isInitialized {
+		return Password{}, fmt.Errorf("password manager not initialized")
+	}
+	p, exists := pm.passwords[name]
+	if !exists {
+		return Password{}, fmt.Errorf("password not found")
+	}
+
+	return p, nil
+}
+
 func main() {
 	pm := NewPasswordManager("passwords.dat")
 
-	uninitErr := pm.SavePassword("github.com", "secret123", "development")
-	fmt.Printf("Save to uninitialized manager: %v\n", uninitErr)
+	_, uninitErr := pm.GetPassword("github.com")
+	fmt.Printf("Get from uninitialized manager: %v\n", uninitErr)
 
 	pm.SetMasterPassword("134234Staple")
 
-	firstErr := pm.SavePassword("github.com", "secret123", "development")
-	fmt.Printf("First save result: %v\n", firstErr)
+	_, notFoundErr := pm.GetPassword("github.com")
+	fmt.Printf("Get non-existent password: %v\n", notFoundErr)
 
-	dupErr := pm.SavePassword("github.com", "anotherSecret", "development")
-	fmt.Printf("Duplicate save result: %v\n", dupErr)
+	pm.SavePassword("github.com", "MyPassword123", "dev")
+
+	found, _ := pm.GetPassword("github.com")
+	fmt.Printf("Found password: %+v\n", found)
 }
