@@ -49,15 +49,33 @@ func (pm *PasswordManager) SetMasterPassword(masterPassword string) error {
 	return nil
 }
 
+func (pm *PasswordManager) SavePassword(name, value, category string) error {
+	if !pm.isInitialized {
+		return fmt.Errorf("password manager not initialized")
+	}
+
+	if _, exists := pm.passwords[name]; exists {
+		return fmt.Errorf("password already exists")
+	}
+
+	newPassword := NewPassword(name, value, category)
+
+	pm.passwords[name] = newPassword
+
+	return nil
+}
+
 func main() {
 	pm := NewPasswordManager("passwords.dat")
 
-	weakErr := pm.SetMasterPassword("short")
-	fmt.Printf("Weak master password: %v\n", weakErr)
+	uninitErr := pm.SavePassword("github.com", "secret123", "development")
+	fmt.Printf("Save to uninitialized manager: %v\n", uninitErr)
 
-	strongErr := pm.SetMasterPassword("BatteryStaple")
-	fmt.Printf("Strong master password: %v\n", strongErr)
+	pm.SetMasterPassword("134234Staple")
 
-	fmt.Printf("Manager initialized: %v\n", pm.isInitialized)
-	fmt.Printf("Master key length: %d\n", len(pm.masterKey))
+	firstErr := pm.SavePassword("github.com", "secret123", "development")
+	fmt.Printf("First save result: %v\n", firstErr)
+
+	dupErr := pm.SavePassword("github.com", "anotherSecret", "development")
+	fmt.Printf("Duplicate save result: %v\n", dupErr)
 }
