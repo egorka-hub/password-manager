@@ -1,8 +1,18 @@
 package main
 
 import (
+	"crypto/rand"
+	"errors"
 	"fmt"
 	"time"
+)
+
+const (
+	upper   = "ABCDEFGHIJKLMNOPQRSTUVWXYZ"
+	lower   = "abcdefghijklmnopqrstuvwxyz"
+	digits  = "0123456789"
+	special = "!@#$%^&*()-_=+[]{}<>?"
+	charset = upper + lower + digits + special
 )
 
 type Password struct {
@@ -40,10 +50,11 @@ func NewPasswordManager(filePath string) *PasswordManager {
 
 func (pm *PasswordManager) SetMasterPassword(masterPassword string) error {
 	if len(masterPassword) < 8 {
-		return fmt.Errorf("password is too weak")
+		return errors.New("password is too weak")
 	}
+
 	pm.masterKey = make([]byte, 32)
-	copy(pm.masterKey, masterPassword)
+	copy(pm.masterKey, []byte(masterPassword))
 	pm.isInitialized = true
 
 	return nil
@@ -51,64 +62,69 @@ func (pm *PasswordManager) SetMasterPassword(masterPassword string) error {
 
 func (pm *PasswordManager) SavePassword(name, value, category string) error {
 	if !pm.isInitialized {
-		return fmt.Errorf("password manager not initialized")
+		return errors.New("master password not set")
 	}
 
 	if _, exists := pm.passwords[name]; exists {
-		return fmt.Errorf("password already exists")
+		return errors.New("password already exists")
 	}
 
-	newPassword := NewPassword(name, value, category)
-
-	pm.passwords[name] = newPassword
+	pm.passwords[name] = NewPassword(name, value, category)
 
 	return nil
 }
 
 func (pm *PasswordManager) GetPassword(name string) (Password, error) {
 	if !pm.isInitialized {
-		return Password{}, fmt.Errorf("password manager not initialized")
+		return Password{}, errors.New("password manager not initialized")
 	}
-	p, exists := pm.passwords[name]
-	if !exists {
-		return Password{}, fmt.Errorf("password not found")
+	if _, exists := pm.passwords[name]; !exists {
+		return Password{}, errors.New("password not found")
 	}
-
-	return p, nil
+	return pm.passwords[name], nil
 }
 
 func (pm *PasswordManager) ListPasswords() []Password {
-	result := make([]Password, 0, len(pm.passwords))
+	pw := make([]Password, 0, len(pm.passwords))
 
-	for _, v := range pm.passwords {
-		result = append(result, v)
+	for _, password := range pm.passwords {
+		pw = append(pw, password)
 	}
 
-	return result
+	return pw
+}
+
+func (pm *PasswordManager) GeneratePassword(length int) (string, error) {
+	if length < 8 {
+		return "", errors.New("password is too weak")
+	}
+
+	buf := make([]byte, length)
+	if _, err := rand.Read(buf); err != nil {
+		return "", err
+	}
+
+	result := make([]byte, length)
+	for i, b := range buf {
+		result[i] = charset[int(b)%len(charset)]
+	}
+
+	return string(result), nil
 }
 
 func main() {
 	pm := NewPasswordManager("passwords.dat")
 
-	_, uninitErr := pm.GetPassword("github.com")
-	fmt.Printf("Get from uninitialized manager: %v\n", uninitErr)
-
-	pm.SetMasterPassword("134234Staple")
-
-	_, notFoundErr := pm.GetPassword("github.com")
-	fmt.Printf("Get non-existent password: %v\n", notFoundErr)
-
-	pm.SavePassword("github.com", "MyPassword123", "dev")
-
-	found, _ := pm.GetPassword("github.com")
-	fmt.Printf("Found password: %+v\n", found)
-
-	pm.SavePassword("gmail.com", "MyPassword456", "email")
-	pm.SavePassword("netflix.com", "MyPassword789", "entertainment")
-
-	list := pm.ListPasswords()
-	fmt.Printf("\nTotal passwords: %d\n\n", len(list))
-	for _, p := range list {
-		fmt.Printf("Service: %-15s Category: %s\n", p.Name, p.Category)
+	pwd, err := pm.GeneratePassword(12)
+	if err != nil {
+		fmt.Println("Error:", err)
+	} else {
+		fmt.Println("Generated password:", pwd)
 	}
+
+	_, err = pm.GeneratePassword(4)
+	if err != nil {
+		fmt.Println("Error for short password:", err)
+	}
+
 }
