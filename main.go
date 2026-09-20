@@ -1,9 +1,14 @@
 package main
 
 import (
+	"crypto/aes"
+	"crypto/cipher"
 	"crypto/rand"
+	"encoding/json"
 	"errors"
 	"fmt"
+	"io"
+	"os"
 	"time"
 )
 
@@ -112,19 +117,71 @@ func (pm *PasswordManager) GeneratePassword(length int) (string, error) {
 	return string(result), nil
 }
 
+func (pm *PasswordManager) SaveToFile() error {
+	if !pm.isInitialized {
+		return errors.New("password manager not initialized")
+	}
+
+	plaintext, err := json.Marshal(pm.passwords)
+	if err != nil {
+		return errors.New("failed to marshal passwords")
+	}
+
+	block, err := aes.NewCipher(pm.masterKey)
+	if err != nil {
+		return errors.New("failed to create cipher")
+	}
+
+	aesgcm, err := cipher.NewGCM(block)
+	if err != nil {
+		return errors.New("failed to create GCM")
+	}
+
+	nonce := make([]byte, aesgcm.NonceSize())
+	if _, err := io.ReadFull(rand.Reader, nonce); err != nil {
+		return errors.New("failed to generate nonce")
+	}
+
+	ciphertext := aesgcm.Seal(nil, nonce, plaintext, nil)
+
+	file, err := os.Create(pm.filePath)
+	if err != nil {
+		return errors.New("failed to create file")
+	}
+	defer file.Close()
+
+	if _, err := file.Write(nonce); err != nil {
+		return errors.New("failed to write nonce to file")
+	}
+
+	if _, err := file.Write(ciphertext); err != nil {
+		return errors.New("failed to write to file")
+	}
+
+	return nil
+}
+
 func main() {
 	pm := NewPasswordManager("passwords.dat")
 
-	pwd, err := pm.GeneratePassword(12)
-	if err != nil {
-		fmt.Println("Error:", err)
-	} else {
-		fmt.Println("Generated password:", pwd)
+	if err := pm.SaveToFile(); err != nil {
+		fmt.Println("Error saving passwords to file:", err)
 	}
 
-	_, err = pm.GeneratePassword(4)
-	if err != nil {
-		fmt.Println("Error for short password:", err)
+	if err := pm.SetMasterPassword("supersecret123"); err != nil {
+		fmt.Println("Error setting master password:", err)
+		return
+	}
+
+	if err := pm.SavePassword("gmail", "qwerty123", "email"); err != nil {
+		fmt.Println("Error saving password:", err)
+		return
+	}
+
+	if err := pm.SaveToFile(); err != nil {
+		fmt.Println("Save after init:", err)
+	} else {
+		fmt.Println("Save after init: <nil>")
 	}
 
 }
