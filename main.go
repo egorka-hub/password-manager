@@ -9,6 +9,7 @@ import (
 	"fmt"
 	"io"
 	"os"
+	"sort"
 	"time"
 )
 
@@ -20,6 +21,13 @@ const (
 	charset = upper + lower + digits + special
 )
 
+var (
+	ErrNotInitialized   = errors.New("password manager not initialized")
+	ErrPasswordExists   = errors.New("password already exists")
+	ErrPasswordNotFound = errors.New("password not found")
+	ErrWeakPassword     = errors.New("password is too weak")
+)
+
 type Password struct {
 	Name         string    `json:"name"`
 	Value        string    `json:"value"`
@@ -29,10 +37,10 @@ type Password struct {
 }
 
 type PasswordManager struct {
-	passwords     map[string]Password `json:"passwords"`
-	masterKey     []byte              `json:"-"`
-	filePath      string              `json:"-"`
-	isInitialized bool                `json:"-"`
+	passwords     map[string]Password
+	masterKey     []byte
+	filePath      string
+	isInitialized bool
 }
 
 func NewPassword(name, value, category string) Password {
@@ -55,11 +63,11 @@ func NewPasswordManager(filePath string) *PasswordManager {
 
 func (pm *PasswordManager) SetMasterPassword(masterPassword string) error {
 	if len(masterPassword) < 8 {
-		return errors.New("password is too weak")
+		return ErrWeakPassword
 	}
 
 	pm.masterKey = make([]byte, 32)
-	copy(pm.masterKey, []byte(masterPassword))
+	copy(pm.masterKey, masterPassword)
 	pm.isInitialized = true
 
 	return nil
@@ -67,11 +75,11 @@ func (pm *PasswordManager) SetMasterPassword(masterPassword string) error {
 
 func (pm *PasswordManager) SavePassword(name, value, category string) error {
 	if !pm.isInitialized {
-		return errors.New("master password not set")
+		return ErrNotInitialized
 	}
 
 	if _, exists := pm.passwords[name]; exists {
-		return errors.New("password already exists")
+		return ErrPasswordExists
 	}
 
 	pm.passwords[name] = NewPassword(name, value, category)
@@ -81,10 +89,10 @@ func (pm *PasswordManager) SavePassword(name, value, category string) error {
 
 func (pm *PasswordManager) GetPassword(name string) (Password, error) {
 	if !pm.isInitialized {
-		return Password{}, errors.New("password manager not initialized")
+		return Password{}, ErrNotInitialized
 	}
 	if _, exists := pm.passwords[name]; !exists {
-		return Password{}, errors.New("password not found")
+		return Password{}, ErrPasswordNotFound
 	}
 	return pm.passwords[name], nil
 }
@@ -101,12 +109,12 @@ func (pm *PasswordManager) ListPasswords() []Password {
 
 func (pm *PasswordManager) GeneratePassword(length int) (string, error) {
 	if length < 8 {
-		return "", errors.New("password is too weak")
+		return "", ErrWeakPassword
 	}
 
 	buf := make([]byte, length)
 	if _, err := rand.Read(buf); err != nil {
-		return "", err
+		return "", fmt.Errorf("read random bytes: %w", err)
 	}
 
 	result := make([]byte, length)
@@ -119,43 +127,87 @@ func (pm *PasswordManager) GeneratePassword(length int) (string, error) {
 
 func (pm *PasswordManager) SaveToFile() error {
 	if !pm.isInitialized {
-		return errors.New("password manager not initialized")
+		return ErrNotInitialized
 	}
 
 	plaintext, err := json.Marshal(pm.passwords)
 	if err != nil {
-		return errors.New("failed to marshal passwords")
+		return fmt.Errorf("marshal passwords: %w", err)
 	}
 
 	block, err := aes.NewCipher(pm.masterKey)
 	if err != nil {
-		return errors.New("failed to create cipher")
+		return fmt.Errorf("create cipher: %w", err)
 	}
 
 	aesgcm, err := cipher.NewGCM(block)
 	if err != nil {
-		return errors.New("failed to create GCM")
+		return fmt.Errorf("create GCM: %w", err)
 	}
 
 	nonce := make([]byte, aesgcm.NonceSize())
 	if _, err := io.ReadFull(rand.Reader, nonce); err != nil {
-		return errors.New("failed to generate nonce")
+		return fmt.Errorf("generate nonce: %w", err)
 	}
 
 	ciphertext := aesgcm.Seal(nil, nonce, plaintext, nil)
 
 	file, err := os.Create(pm.filePath)
 	if err != nil {
-		return errors.New("failed to create file")
+		return fmt.Errorf("create %s: %w", pm.filePath, err)
 	}
 	defer file.Close()
 
 	if _, err := file.Write(nonce); err != nil {
-		return errors.New("failed to write nonce to file")
+		return fmt.Errorf("write nonce: %w", err)
 	}
 
 	if _, err := file.Write(ciphertext); err != nil {
-		return errors.New("failed to write to file")
+		return fmt.Errorf("write ciphertext: %w", err)
+	}
+
+	return nil
+}
+
+func (pm *PasswordManager) LoadFromFile() error {
+	if !pm.isInitialized {
+		return ErrNotInitialized
+	}
+
+	file, err := os.Open(pm.filePath)
+	if err != nil {
+		return fmt.Errorf("open %s: %w", pm.filePath, err)
+	}
+	defer file.Close()
+
+	block, err := aes.NewCipher(pm.masterKey)
+	if err != nil {
+		return fmt.Errorf("create cipher: %w", err)
+	}
+
+	aesgcm, err := cipher.NewGCM(block)
+	if err != nil {
+		return fmt.Errorf("create GCM: %w", err)
+	}
+
+	nonce := make([]byte, aesgcm.NonceSize())
+	if _, err := io.ReadFull(file, nonce); err != nil {
+		return fmt.Errorf("read nonce: %w", err)
+	}
+
+	encryptedData, err := io.ReadAll(file)
+	if err != nil {
+		return fmt.Errorf("read %s: %w", pm.filePath, err)
+	}
+
+	decryptedData, err := aesgcm.Open(nil, nonce, encryptedData, nil)
+	if err != nil {
+		return fmt.Errorf("decrypt: %w", err)
+	}
+
+	err = json.Unmarshal(decryptedData, &pm.passwords)
+	if err != nil {
+		return fmt.Errorf("unmarshal passwords: %w", err)
 	}
 
 	return nil
@@ -164,24 +216,53 @@ func (pm *PasswordManager) SaveToFile() error {
 func main() {
 	pm := NewPasswordManager("passwords.dat")
 
-	if err := pm.SaveToFile(); err != nil {
-		fmt.Println("Error saving passwords to file:", err)
-	}
-
-	if err := pm.SetMasterPassword("supersecret123"); err != nil {
-		fmt.Println("Error setting master password:", err)
+	err := pm.SetMasterPassword("password49442")
+	if err != nil {
+		fmt.Println(err)
 		return
 	}
 
-	if err := pm.SavePassword("gmail", "qwerty123", "email"); err != nil {
-		fmt.Println("Error saving password:", err)
+	err = pm.SavePassword("github.com", "username", "dev")
+	if err != nil {
+		fmt.Println(err)
 		return
 	}
 
-	if err := pm.SaveToFile(); err != nil {
-		fmt.Println("Save after init:", err)
-	} else {
-		fmt.Println("Save after init: <nil>")
+	err = pm.SavePassword("gmail.com", "username2", "email")
+	if err != nil {
+		fmt.Println(err)
+		return
 	}
 
+	err = pm.SaveToFile()
+	if err != nil {
+		fmt.Println(err)
+		return
+	}
+
+	pm2 := NewPasswordManager("passwords.dat")
+
+	err = pm2.SetMasterPassword("password49442")
+	if err != nil {
+		fmt.Println(err)
+		return
+	}
+
+	err = pm2.LoadFromFile()
+	if err != nil {
+		fmt.Println(err)
+		return
+	}
+
+	list := pm2.ListPasswords()
+
+	sort.Slice(list, func(i, j int) bool {
+		return list[i].Name < list[j].Name
+	})
+
+	fmt.Printf("Loaded passwords: %d\n", len(list))
+
+	for _, p := range list {
+		fmt.Printf("Service: %s\tCategory: %s\n", p.Name, p.Category)
+	}
 }
