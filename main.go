@@ -9,7 +9,7 @@ import (
 	"fmt"
 	"io"
 	"os"
-	"sort"
+	"strings"
 	"time"
 )
 
@@ -213,56 +213,44 @@ func (pm *PasswordManager) LoadFromFile() error {
 	return nil
 }
 
+func (pm *PasswordManager) CheckPasswordStrength(password string) error {
+	if len(password) < 8 {
+		return ErrWeakPassword
+	}
+
+	var hasUpper, hasLower, hasDigit, hasSpecial bool
+
+	for _, r := range password {
+		switch {
+		case r >= 'A' && r <= 'Z':
+			hasUpper = true
+		case r >= 'a' && r <= 'z':
+			hasLower = true
+		case r >= '0' && r <= '9':
+			hasDigit = true
+		case strings.ContainsRune(special, r):
+			hasSpecial = true
+		}
+	}
+
+	if !hasUpper || !hasLower || !hasDigit || !hasSpecial {
+		return ErrWeakPassword
+	}
+	return nil
+}
+
 func main() {
 	pm := NewPasswordManager("passwords.dat")
 
-	err := pm.SetMasterPassword("password49442")
-	if err != nil {
-		fmt.Println(err)
-		return
+	candidates := []string{
+		"short",
+		"password123",
+		"Password123",
+		"Pass123!",
+		"Ab1!defghijklm",
 	}
 
-	err = pm.SavePassword("github.com", "username", "dev")
-	if err != nil {
-		fmt.Println(err)
-		return
-	}
-
-	err = pm.SavePassword("gmail.com", "username2", "email")
-	if err != nil {
-		fmt.Println(err)
-		return
-	}
-
-	err = pm.SaveToFile()
-	if err != nil {
-		fmt.Println(err)
-		return
-	}
-
-	pm2 := NewPasswordManager("passwords.dat")
-
-	err = pm2.SetMasterPassword("password49442")
-	if err != nil {
-		fmt.Println(err)
-		return
-	}
-
-	err = pm2.LoadFromFile()
-	if err != nil {
-		fmt.Println(err)
-		return
-	}
-
-	list := pm2.ListPasswords()
-
-	sort.Slice(list, func(i, j int) bool {
-		return list[i].Name < list[j].Name
-	})
-
-	fmt.Printf("Loaded passwords: %d\n", len(list))
-
-	for _, p := range list {
-		fmt.Printf("Service: %s\tCategory: %s\n", p.Name, p.Category)
+	for _, candidate := range candidates {
+		fmt.Printf("Password: %-16s -> %v\n", candidate, pm.CheckPasswordStrength(candidate))
 	}
 }
