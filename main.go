@@ -8,7 +8,9 @@ import (
 	"errors"
 	"fmt"
 	"io"
+	"log"
 	"os"
+	"slices"
 	"strings"
 	"time"
 )
@@ -239,18 +241,59 @@ func (pm *PasswordManager) CheckPasswordStrength(password string) error {
 	return nil
 }
 
+func (pm *PasswordManager) GetPasswordsByCategory(category string) []Password {
+	passwords := make([]Password, 0)
+	for _, password := range pm.passwords {
+		if !strings.EqualFold(password.Category, category) {
+			continue
+		}
+		passwords = append(passwords, password)
+	}
+	return passwords
+}
+
 func main() {
 	pm := NewPasswordManager("passwords.dat")
 
-	candidates := []string{
-		"short",
-		"password123",
-		"Password123",
-		"Pass123!",
-		"Ab1!defghijklm",
+	if err := pm.SetMasterPassword("master-password"); err != nil {
+		log.Fatal(err)
 	}
 
-	for _, candidate := range candidates {
-		fmt.Printf("Password: %-16s -> %v\n", candidate, pm.CheckPasswordStrength(candidate))
+	entries := []struct {
+		name     string
+		value    string
+		category string
+	}{
+		{"github.com", "Gh!Str0ng#pass", "dev"},
+		{"gitlab.com", "Gl!Str0ng#pass", "dev"},
+		{"gmail.com", "Gm!Str0ng#pass", "email"},
+		{"yahoo.com", "Yh!Str0ng#pass", "email"},
+		{"netflix.com", "Nf!Str0ng#pass", "entertainment"},
+	}
+
+	for _, e := range entries {
+		if err := pm.SavePassword(e.name, e.value, e.category); err != nil {
+			log.Fatalf("cannot save %s: %v", e.name, err)
+		}
+	}
+
+	categories := []string{"dev", "email", "entertainment", "nonexistent"}
+
+	for _, category := range categories {
+		found := pm.GetPasswordsByCategory(category)
+		slices.SortFunc(found, func(a, b Password) int {
+			return strings.Compare(a.Name, b.Name)
+		})
+
+		word := "passwords"
+		if len(found) == 1 {
+			word = "password"
+		}
+
+		fmt.Printf("Category '%s' (%d %s):\n", category, len(found), word)
+		for _, p := range found {
+			fmt.Printf("- %s\n", p.Name)
+		}
+		fmt.Println()
 	}
 }
