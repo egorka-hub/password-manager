@@ -287,29 +287,39 @@ func (pm *PasswordManager) UpdatePassword(name, newValue string) error {
 	return nil
 }
 
+func (pm *PasswordManager) DeletePassword(name string) error {
+	if !pm.isInitialized {
+		return ErrNotInitialized
+	}
+
+	if _, exists := pm.passwords[name]; !exists {
+		return ErrPasswordNotFound
+	}
+
+	delete(pm.passwords, name)
+
+	return nil
+}
+
 func main() {
 	pm := NewPasswordManager("passwords.dat")
 
-	if err := pm.SetMasterPassword("master-password"); err != nil {
+	if err := pm.SetMasterPassword("mysecretpassword"); err != nil {
 		log.Fatalf("set master password: %v", err)
 	}
 
-	if err := pm.SavePassword("github.com", "OldStrongPass123!", "dev"); err != nil {
+	if err := pm.SavePassword("gmail.com", "mynewpassword234324", "chat"); err != nil {
 		log.Fatalf("save password: %v", err)
 	}
 
-	err := pm.UpdatePassword("github.com", "weak")
-	fmt.Printf("Updating to a weak password: %v\n", err)
+	err := pm.DeletePassword("nonexistent.com")
+	fmt.Printf("Deleting a nonexistent password: %v\n", err)
 
-	err = pm.UpdatePassword("github.com", "NewStrongPass123!")
-	fmt.Printf("Updating to a strong password: %v\n", err)
+	err = pm.DeletePassword("gmail.com")
+	fmt.Printf("Deleting an existing password: %v\n", err)
 
-	updated, err := pm.GetPassword("github.com")
-	if err != nil {
-		log.Fatalf("get password: %v", err)
-	}
-	fmt.Printf("Updated password: %+v\n", updated)
+	fmt.Printf("Remaining number of passwords: %d\n", len(pm.ListPasswords()))
 
-	err = pm.UpdatePassword("nonexistent.com", "NewStrongPass123!")
-	fmt.Printf("Updating a nonexistent password: %v\n", err)
+	_, err = pm.GetPassword("gmail.com")
+	fmt.Printf("Attempt to get a deleted password: %v\n", err)
 }
