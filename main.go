@@ -252,48 +252,61 @@ func (pm *PasswordManager) GetPasswordsByCategory(category string) []Password {
 	return passwords
 }
 
+func (pm *PasswordManager) FindDuplicatePasswords() map[string][]string {
+	byValue := make(map[string][]string)
+	for _, password := range pm.passwords {
+		byValue[password.Value] = append(byValue[password.Value], password.Name)
+	}
+
+	for value, services := range byValue {
+		if len(services) < 2 {
+			delete(byValue, value)
+		}
+	}
+
+	return byValue
+}
+
 func main() {
 	pm := NewPasswordManager("passwords.dat")
 
-	if err := pm.SetMasterPassword("master-password"); err != nil {
-		log.Fatal(err)
+	err := pm.SetMasterPassword("master-password4234")
+	if err != nil {
+		log.Fatalf("set master password: %v", err)
 	}
 
 	entries := []struct {
-		name     string
-		value    string
-		category string
+		Name     string
+		Value    string
+		Category string
 	}{
-		{"github.com", "Gh!Str0ng#pass", "dev"},
-		{"gitlab.com", "Gl!Str0ng#pass", "dev"},
-		{"gmail.com", "Gm!Str0ng#pass", "email"},
-		{"yahoo.com", "Yh!Str0ng#pass", "email"},
-		{"netflix.com", "Nf!Str0ng#pass", "entertainment"},
+		{"google", "password123", "work"},
+		{"facebook", "password123", "personal"},
+		{"amazon", "password456", "shopping"},
+		{"netflix", "password789", "entertainment"},
+		{"github", "password123", "personal"},
 	}
 
-	for _, e := range entries {
-		if err := pm.SavePassword(e.name, e.value, e.category); err != nil {
-			log.Fatalf("cannot save %s: %v", e.name, err)
+	for _, entry := range entries {
+		err := pm.SavePassword(entry.Name, entry.Value, entry.Category)
+		if err != nil {
+			log.Fatal(err)
 		}
 	}
 
-	categories := []string{"dev", "email", "entertainment", "nonexistent"}
+	duplicates := pm.FindDuplicatePasswords()
+	if len(duplicates) == 0 {
+		fmt.Println("No duplicates found")
+		return
+	}
 
-	for _, category := range categories {
-		found := pm.GetPasswordsByCategory(category)
-		slices.SortFunc(found, func(a, b Password) int {
-			return strings.Compare(a.Name, b.Name)
-		})
+	fmt.Println("Found duplicates:")
+	for _, services := range duplicates {
+		slices.Sort(services)
 
-		word := "passwords"
-		if len(found) == 1 {
-			word = "password"
+		fmt.Printf("\nDuplicate password used in %d services:\n", len(services))
+		for _, service := range services {
+			fmt.Printf("- %s\n", service)
 		}
-
-		fmt.Printf("Category '%s' (%d %s):\n", category, len(found), word)
-		for _, p := range found {
-			fmt.Printf("- %s\n", p.Name)
-		}
-		fmt.Println()
 	}
 }
