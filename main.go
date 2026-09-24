@@ -10,7 +10,6 @@ import (
 	"io"
 	"log"
 	"os"
-	"slices"
 	"strings"
 	"time"
 )
@@ -267,46 +266,50 @@ func (pm *PasswordManager) FindDuplicatePasswords() map[string][]string {
 	return byValue
 }
 
+func (pm *PasswordManager) UpdatePassword(name, newValue string) error {
+	if !pm.isInitialized {
+		return ErrNotInitialized
+	}
+
+	password, exists := pm.passwords[name]
+	if !exists {
+		return ErrPasswordNotFound
+	}
+
+	if err := pm.CheckPasswordStrength(newValue); err != nil {
+		return err
+	}
+
+	password.Value = newValue
+	password.LastModified = time.Now()
+	pm.passwords[name] = password
+
+	return nil
+}
+
 func main() {
 	pm := NewPasswordManager("passwords.dat")
 
-	err := pm.SetMasterPassword("master-password4234")
-	if err != nil {
+	if err := pm.SetMasterPassword("master-password"); err != nil {
 		log.Fatalf("set master password: %v", err)
 	}
 
-	entries := []struct {
-		Name     string
-		Value    string
-		Category string
-	}{
-		{"google", "password123", "work"},
-		{"facebook", "password123", "personal"},
-		{"amazon", "password456", "shopping"},
-		{"netflix", "password789", "entertainment"},
-		{"github", "password123", "personal"},
+	if err := pm.SavePassword("github.com", "OldStrongPass123!", "dev"); err != nil {
+		log.Fatalf("save password: %v", err)
 	}
 
-	for _, entry := range entries {
-		err := pm.SavePassword(entry.Name, entry.Value, entry.Category)
-		if err != nil {
-			log.Fatal(err)
-		}
-	}
+	err := pm.UpdatePassword("github.com", "weak")
+	fmt.Printf("Updating to a weak password: %v\n", err)
 
-	duplicates := pm.FindDuplicatePasswords()
-	if len(duplicates) == 0 {
-		fmt.Println("No duplicates found")
-		return
-	}
+	err = pm.UpdatePassword("github.com", "NewStrongPass123!")
+	fmt.Printf("Updating to a strong password: %v\n", err)
 
-	fmt.Println("Found duplicates:")
-	for _, services := range duplicates {
-		slices.Sort(services)
-
-		fmt.Printf("\nDuplicate password used in %d services:\n", len(services))
-		for _, service := range services {
-			fmt.Printf("- %s\n", service)
-		}
+	updated, err := pm.GetPassword("github.com")
+	if err != nil {
+		log.Fatalf("get password: %v", err)
 	}
+	fmt.Printf("Updated password: %+v\n", updated)
+
+	err = pm.UpdatePassword("nonexistent.com", "NewStrongPass123!")
+	fmt.Printf("Updating a nonexistent password: %v\n", err)
 }
