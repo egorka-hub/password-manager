@@ -318,27 +318,66 @@ func (pm *PasswordManager) ListCategories() []string {
 	return categories
 }
 
+func (pm *PasswordManager) GetPasswordStats() map[string]any {
+	var newest, oldest time.Time
+	categoryCounts := make(map[string]int)
+
+	for _, p := range pm.passwords {
+		categoryCounts[strings.ToLower(p.Category)]++
+
+		if p.CreatedAt.After(newest) {
+			newest = p.CreatedAt
+		}
+
+		if oldest.IsZero() || p.CreatedAt.Before(oldest) {
+			oldest = p.CreatedAt
+		}
+	}
+
+	return map[string]any{
+		"totalPasswords": len(pm.passwords),
+		"categories":     pm.ListCategories(),
+		"categoryCounts": categoryCounts,
+		"newestPassword": newest,
+		"oldestPassword": oldest,
+	}
+}
+
 func main() {
 	pm := NewPasswordManager("passwords.dat")
 
-	if err := pm.SetMasterPassword("mysecretpassword843582"); err != nil {
+	if err := pm.SetMasterPassword("pass43r4"); err != nil {
 		log.Fatalf("set master password: %v", err)
 	}
 
-	if err := pm.SavePassword("gmail.com", "mynewpassword23432r24", "chat"); err != nil {
+	if err := pm.SavePassword("gmail.com", "dflsdfwer,f3443", "chat"); err != nil {
 		log.Fatalf("save password: %v", err)
 	}
 
-	if err := pm.SavePassword("github.com", "mynewpaswerKDS32r24", "it"); err != nil {
+	if err := pm.SavePassword("claude.ai", "324324234f3443", "tools"); err != nil {
 		log.Fatalf("save password: %v", err)
 	}
 
-	categories := pm.ListCategories()
-
-	fmt.Printf("Total categories: %d\n\n", len(categories))
-	fmt.Println("List of categories:")
-	for _, c := range categories {
-		fmt.Printf("- %s\n", c)
+	if err := pm.SavePassword("gpt.com", "324werewrrew443", "tools"); err != nil {
+		log.Fatalf("save password: %v", err)
 	}
 
+	if err := pm.SavePassword("instagram.com", "324erwre#@ewrrew443", "nets"); err != nil {
+		log.Fatalf("save password: %v", err)
+	}
+
+	stats := pm.GetPasswordStats()
+	categories := stats["categories"].([]string)
+	categoryCounts := stats["categoryCounts"].(map[string]int)
+	oldest := stats["oldestPassword"].(time.Time)
+	newest := stats["newestPassword"].(time.Time)
+
+	fmt.Printf("Total passwords: %d\n\n", stats["totalPasswords"])
+	fmt.Println("Passwords by category:")
+	for _, cat := range categories {
+		fmt.Printf("- %s: %d\n", cat, categoryCounts[cat])
+	}
+
+	fmt.Printf("\nOldest password: %s\n", oldest.Format(time.DateTime))
+	fmt.Printf("Newest password: %s\n", newest.Format(time.DateTime))
 }
