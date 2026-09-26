@@ -10,6 +10,7 @@ import (
 	"io"
 	"log"
 	"os"
+	"sort"
 	"strings"
 	"time"
 )
@@ -301,25 +302,43 @@ func (pm *PasswordManager) DeletePassword(name string) error {
 	return nil
 }
 
+func (pm *PasswordManager) ListCategories() []string {
+	unique := make(map[string]bool)
+	for _, p := range pm.passwords {
+		unique[strings.ToLower(p.Category)] = true
+	}
+
+	categories := make([]string, 0, len(unique))
+	for c := range unique {
+		categories = append(categories, c)
+	}
+
+	sort.Strings(categories)
+
+	return categories
+}
+
 func main() {
 	pm := NewPasswordManager("passwords.dat")
 
-	if err := pm.SetMasterPassword("mysecretpassword"); err != nil {
+	if err := pm.SetMasterPassword("mysecretpassword843582"); err != nil {
 		log.Fatalf("set master password: %v", err)
 	}
 
-	if err := pm.SavePassword("gmail.com", "mynewpassword234324", "chat"); err != nil {
+	if err := pm.SavePassword("gmail.com", "mynewpassword23432r24", "chat"); err != nil {
 		log.Fatalf("save password: %v", err)
 	}
 
-	err := pm.DeletePassword("nonexistent.com")
-	fmt.Printf("Deleting a nonexistent password: %v\n", err)
+	if err := pm.SavePassword("github.com", "mynewpaswerKDS32r24", "it"); err != nil {
+		log.Fatalf("save password: %v", err)
+	}
 
-	err = pm.DeletePassword("gmail.com")
-	fmt.Printf("Deleting an existing password: %v\n", err)
+	categories := pm.ListCategories()
 
-	fmt.Printf("Remaining number of passwords: %d\n", len(pm.ListPasswords()))
+	fmt.Printf("Total categories: %d\n\n", len(categories))
+	fmt.Println("List of categories:")
+	for _, c := range categories {
+		fmt.Printf("- %s\n", c)
+	}
 
-	_, err = pm.GetPassword("gmail.com")
-	fmt.Printf("Attempt to get a deleted password: %v\n", err)
 }
