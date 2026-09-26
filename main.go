@@ -1,6 +1,7 @@
 package main
 
 import (
+	"bufio"
 	"crypto/aes"
 	"crypto/cipher"
 	"crypto/rand"
@@ -8,7 +9,6 @@ import (
 	"errors"
 	"fmt"
 	"io"
-	"log"
 	"os"
 	"sort"
 	"strings"
@@ -21,6 +21,13 @@ const (
 	digits  = "0123456789"
 	special = "!@#$%^&*()-_=+[]{}<>?"
 	charset = upper + lower + digits + special
+)
+
+const (
+	colorRed    = "\033[31m"
+	colorGreen  = "\033[32m"
+	colorYellow = "\033[33m"
+	colorReset  = "\033[0m"
 )
 
 var (
@@ -343,41 +350,33 @@ func (pm *PasswordManager) GetPasswordStats() map[string]any {
 	}
 }
 
+func clearScreen() {
+	fmt.Print("\033[H\033[2J")
+}
+
+func showSuccess(message string) {
+	fmt.Println(colorGreen + "✓ Success: " + message + colorReset)
+}
+
+func showError(message string) {
+	fmt.Println(colorRed + "✗ Error: " + message + colorReset)
+}
+
+func showInfo(message string) {
+	fmt.Println(colorYellow + "→ Info: " + message + colorReset)
+}
+
+func waitForEnter() {
+	fmt.Println("Press Enter to continue...")
+	reader := bufio.NewReader(os.Stdin)
+	_, _ = reader.ReadString('\n')
+}
+
 func main() {
-	pm := NewPasswordManager("passwords.dat")
-
-	if err := pm.SetMasterPassword("pass43r4"); err != nil {
-		log.Fatalf("set master password: %v", err)
-	}
-
-	if err := pm.SavePassword("gmail.com", "dflsdfwer,f3443", "chat"); err != nil {
-		log.Fatalf("save password: %v", err)
-	}
-
-	if err := pm.SavePassword("claude.ai", "324324234f3443", "tools"); err != nil {
-		log.Fatalf("save password: %v", err)
-	}
-
-	if err := pm.SavePassword("gpt.com", "324werewrrew443", "tools"); err != nil {
-		log.Fatalf("save password: %v", err)
-	}
-
-	if err := pm.SavePassword("instagram.com", "324erwre#@ewrrew443", "nets"); err != nil {
-		log.Fatalf("save password: %v", err)
-	}
-
-	stats := pm.GetPasswordStats()
-	categories := stats["categories"].([]string)
-	categoryCounts := stats["categoryCounts"].(map[string]int)
-	oldest := stats["oldestPassword"].(time.Time)
-	newest := stats["newestPassword"].(time.Time)
-
-	fmt.Printf("Total passwords: %d\n\n", stats["totalPasswords"])
-	fmt.Println("Passwords by category:")
-	for _, cat := range categories {
-		fmt.Printf("- %s: %d\n", cat, categoryCounts[cat])
-	}
-
-	fmt.Printf("\nOldest password: %s\n", oldest.Format(time.DateTime))
-	fmt.Printf("Newest password: %s\n", newest.Format(time.DateTime))
+	showSuccess("Password saved successfully")
+	showError("Invalid data format")
+	showInfo("Press Enter to continue")
+	fmt.Println()
+	waitForEnter()
+	clearScreen()
 }
