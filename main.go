@@ -562,6 +562,21 @@ func HandlePasswordUpdate(pm *PasswordManager) error {
 	return nil
 }
 
+func HandleExitAndSave(pm *PasswordManager) error {
+	clearScreen()
+	fmt.Println("=== Saving and Exiting ===")
+	fmt.Println("Saving changes...")
+	err := pm.SaveToFile()
+	if err != nil {
+		wrapped := fmt.Errorf("error saving data: %w", err)
+		showError(wrapped.Error())
+		return wrapped
+	}
+	showSuccess("Changes saved successfully!")
+	showSuccess("Goodbye!")
+	return nil
+}
+
 func main() {
 
 }
