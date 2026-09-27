@@ -13,6 +13,8 @@ import (
 	"sort"
 	"strings"
 	"time"
+
+	"golang.org/x/term"
 )
 
 const (
@@ -372,11 +374,38 @@ func waitForEnter() {
 	_, _ = reader.ReadString('\n')
 }
 
-func main() {
-	showSuccess("Password saved successfully")
-	showError("Invalid data format")
-	showInfo("Press Enter to continue")
+func ReadUserInput(prompt string) string {
+	fmt.Print(prompt)
+	r := bufio.NewReader(os.Stdin)
+	input, err := r.ReadString('\n')
+	if err != nil {
+		showError("Failed to read input")
+		return ""
+	}
+	input = strings.TrimSpace(input)
+	return input
+}
+
+func readPassword() (string, error) {
+	password, err := term.ReadPassword(int(os.Stdin.Fd()))
 	fmt.Println()
-	waitForEnter()
-	clearScreen()
+	if err != nil {
+		return "", fmt.Errorf("failed to read password: %w", err)
+	}
+	result := string(password)
+	return result, nil
+}
+
+func main() {
+	name := ReadUserInput("Enter name: ")
+	fmt.Println("You entered:", name)
+	fmt.Println()
+
+	fmt.Print("Enter password: ")
+	password, err := readPassword()
+	if err != nil {
+		showError(err.Error())
+		return
+	}
+	fmt.Println("Password length:", len(password))
 }
