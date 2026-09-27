@@ -11,6 +11,7 @@ import (
 	"io"
 	"os"
 	"sort"
+	"strconv"
 	"strings"
 	"time"
 
@@ -432,7 +433,7 @@ func PrintPasswordList(passwords []Password) {
 }
 
 func ShowPasswordDetails(password Password) {
-	fmt.Println("=== Password details ===")
+	fmt.Println("=== Password Details ===")
 	fmt.Printf("Service: %s\n", password.Name)
 	fmt.Printf("Category: %s\n", password.Category)
 	fmt.Printf("Password: %s\n", password.Value)
@@ -440,24 +441,127 @@ func ShowPasswordDetails(password Password) {
 	fmt.Printf("Last Modified: %s\n", password.LastModified.Format("2006-01-02 15:04:05"))
 }
 
-func main() {
-	pm := NewPasswordManager("passwords.dat")
-	if err := pm.SetMasterPassword("MasterPass123!"); err != nil {
-		showError(err.Error())
-		return
+func HandlePasswordGeneration(pm *PasswordManager) error {
+	clearScreen()
+	defer waitForEnter()
+	fmt.Println("=== Password Generation ===")
+	input := ReadUserInput("Enter password length (min 8): ")
+	length, err := strconv.Atoi(input)
+	if err != nil {
+		showError("Length must be a whole number")
+		return err
+	}
+	p, err := pm.GeneratePassword(length)
+	if err != nil {
+		if errors.Is(err, ErrWeakPassword) {
+			showError("Length must be at least 8")
+		} else {
+			showError("Failed to generate password")
+		}
+		return err
+	}
+	showSuccess("Password generated successfully")
+	fmt.Println("Generated password:", p)
+	return nil
+}
+
+func HandlePasswordAdd(pm *PasswordManager) error {
+	clearScreen()
+	defer waitForEnter()
+	fmt.Println("=== Add New Password ===")
+	input := ReadUserInput("Enter service name: ")
+	if input == "" {
+		showError("Service name cannot be empty")
+		return nil
 	}
 
-	_ = pm.SavePassword("github.com", "GitPass123!", "dev")
-	_ = pm.SavePassword("gmail.com", "MailPass456!", "email")
-
-	ShowMainMenu()
-
-	PrintPasswordList(pm.ListPasswords())
-
-	password, err := pm.GetPassword("github.com")
+	fmt.Print("Enter password (or press Enter to generate): ")
+	value, err := readPassword()
 	if err != nil {
-		showError(err.Error())
-		return
+		showError("Failed to read password")
+		return err
+	}
+	if value == "" {
+		value, err = pm.GeneratePassword(16)
+		if err != nil {
+			showError("Failed to generate password")
+			return err
+		}
+		showInfo("Generated password: " + value)
+	}
+
+	category := ReadUserInput("Enter category: ")
+
+	if err = pm.SavePassword(input, value, category); err != nil {
+		if errors.Is(err, ErrPasswordExists) {
+			showError("Password for " + input + " already exists, use update instead")
+		} else if errors.Is(err, ErrNotInitialized) {
+			showError("Password manager is not initialized")
+		} else {
+			showError("Failed to save password")
+		}
+		return err
+	}
+	showSuccess("Password saved successfully")
+	return nil
+}
+
+func HandlePasswordSearch(pm *PasswordManager) error {
+	clearScreen()
+	defer waitForEnter()
+	fmt.Println("=== Search Password ===")
+	input := ReadUserInput("Enter service name: ")
+	if input == "" {
+		showError("Service name cannot be empty")
+		return nil
+	}
+
+	password, err := pm.GetPassword(input)
+	if err != nil {
+		if errors.Is(err, ErrPasswordNotFound) {
+			showError("Password for " + input + " not found")
+		} else if errors.Is(err, ErrNotInitialized) {
+			showError("Password manager is not initialized")
+		} else {
+			showError("Failed to get password")
+		}
+		return err
 	}
 	ShowPasswordDetails(password)
+	return nil
+}
+func HandlePasswordUpdate(pm *PasswordManager) error {
+	clearScreen()
+	defer waitForEnter()
+	fmt.Println("=== Update Password ===")
+	input := ReadUserInput("Enter service name: ")
+	if input == "" {
+		showError("Service name cannot be empty")
+		return nil
+	}
+	fmt.Print("Enter new password: ")
+	newValue, err := readPassword()
+	if err != nil {
+		showError("Failed to read password")
+		return err
+	}
+	err = pm.UpdatePassword(input, newValue)
+	if err != nil {
+		if errors.Is(err, ErrNotInitialized) {
+			showError("Password manager is not initialized")
+		} else if errors.Is(err, ErrWeakPassword) {
+			showError("Password is too weak (min 8 chars, upper, lower, digit, special)")
+		} else if errors.Is(err, ErrPasswordNotFound) {
+			showError("Password for " + input + " not found")
+		} else {
+			showError("Failed to update password")
+		}
+		return err
+	}
+	showSuccess("Password updated successfully")
+	return nil
+}
+
+func main() {
+
 }
