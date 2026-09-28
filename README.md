@@ -155,7 +155,12 @@ Enter master password:
 
 ```text
 password-manager/
-├── main.go          # весь код приложения
+├── main.go          # точка входа: инициализация и главный цикл меню
+├── password.go      # модель Password и ошибки
+├── manager.go       # PasswordManager и операции с паролями
+├── storage.go       # шифрование и работа с файлом
+├── ui.go            # консольный вывод и ввод
+├── handlers.go      # обработчики пунктов меню
 ├── go.mod           # модуль и зависимости
 ├── go.sum           # контрольные суммы зависимостей
 ├── Makefile         # сборка, запуск и проверки
@@ -165,16 +170,16 @@ password-manager/
 └── docs/            # скриншоты для README
 ```
 
-Код в `main.go` разделён на слои:
+Все файлы относятся к одному пакету `main`:
 
-| Слой | Что входит |
+| Файл | Что внутри |
 |------|------------|
-| Модель | `Password`, `PasswordManager`, ошибки `ErrNotInitialized`, `ErrPasswordExists`, `ErrPasswordNotFound`, `ErrWeakPassword` |
-| Бизнес-логика | Методы `PasswordManager`: `SavePassword`, `GetPassword`, `UpdatePassword`, `DeletePassword`, `GeneratePassword`, `CheckPasswordStrength`, `ListCategories`, `GetPasswordStats`, `FindDuplicatePasswords` |
-| Хранение | `SaveToFile` и `LoadFromFile`: шифрование AES-256-GCM и работа с файлом |
-| Консольный интерфейс | `ShowMainMenu`, `PrintPasswordList`, `ShowPasswordDetails`, `ReadUserInput`, цветные сообщения `showSuccess` / `showError` / `showInfo` |
-| Обработчики меню | `HandlePasswordGeneration`, `HandlePasswordAdd`, `HandlePasswordSearch`, `HandlePasswordList`, `HandlePasswordUpdate`, `HandlePasswordDelete`, `HandleCategoryList`, `HandlePasswordStats`, `HandleDuplicatePasswords`, `HandleExitAndSave` |
-| Точка входа | `main`: инициализация, загрузка хранилища, главный цикл меню |
+| `password.go` | Тип `Password`, конструктор `NewPassword`, ошибки `ErrNotInitialized`, `ErrPasswordExists`, `ErrPasswordNotFound`, `ErrWeakPassword` |
+| `manager.go` | Тип `PasswordManager` и его методы: `SetMasterPassword`, `SavePassword`, `GetPassword`, `UpdatePassword`, `DeletePassword`, `GeneratePassword`, `CheckPasswordStrength`, `ListCategories`, `GetPasswordStats`, `FindDuplicatePasswords` |
+| `storage.go` | `SaveToFile` и `LoadFromFile`: шифрование AES-256-GCM и работа с файлом |
+| `ui.go` | `ShowMainMenu`, `PrintPasswordList`, `ShowPasswordDetails`, `ReadUserInput`, скрытый ввод `readPassword`, цветные сообщения `showSuccess` / `showError` / `showInfo` |
+| `handlers.go` | `HandlePasswordGeneration`, `HandlePasswordAdd`, `HandlePasswordSearch`, `HandlePasswordList`, `HandlePasswordUpdate`, `HandlePasswordDelete`, `HandleCategoryList`, `HandlePasswordStats`, `HandleDuplicatePasswords`, `HandleExitAndSave` |
+| `main.go` | `main`: инициализация, загрузка хранилища, главный цикл меню |
 
 Единственная внешняя зависимость — `golang.org/x/term` для скрытого ввода пароля.
 
