@@ -577,6 +577,185 @@ func HandleExitAndSave(pm *PasswordManager) error {
 	return nil
 }
 
+func HandlePasswordList(pm *PasswordManager) {
+	clearScreen()
+	defer waitForEnter()
+	passwords := pm.ListPasswords()
+	if len(passwords) == 0 {
+		showInfo("No passwords saved yet")
+		return
+	}
+	sort.Slice(passwords, func(i, j int) bool {
+		return strings.ToLower(passwords[i].Name) < strings.ToLower(passwords[j].Name)
+	})
+	PrintPasswordList(passwords)
+}
+
+func HandlePasswordDelete(pm *PasswordManager) {
+	clearScreen()
+	defer waitForEnter()
+	fmt.Println("=== Delete Password ===")
+	input := ReadUserInput("Enter service name: ")
+	if input == "" {
+		showError("Service name cannot be empty")
+		return
+	}
+	if _, err := pm.GetPassword(input); err != nil {
+		if errors.Is(err, ErrPasswordNotFound) {
+			showError("Password for " + input + " not found")
+		} else if errors.Is(err, ErrNotInitialized) {
+			showError("Password manager is not initialized")
+		} else {
+			showError("Failed to get password")
+		}
+		return
+	}
+	confirm := ReadUserInput("Delete " + input + "? (y/n): ")
+	if strings.ToLower(confirm) != "y" {
+		showInfo("Deletion cancelled")
+		return
+	}
+	if err := pm.DeletePassword(input); err != nil {
+		showError("Failed to delete password")
+		return
+	}
+	showSuccess("Password deleted successfully!")
+}
+
+func HandleCategoryList(pm *PasswordManager) {
+	clearScreen()
+	defer waitForEnter()
+	fmt.Println("=== Categories ===")
+	list := pm.ListCategories()
+	if len(list) == 0 {
+		showInfo("No categories yet")
+		return
+	}
+	for _, category := range list {
+		if category == "" {
+			fmt.Println("- (no category)")
+			continue
+		}
+		fmt.Println("- " + category)
+	}
+}
+
+func HandlePasswordStats(pm *PasswordManager) {
+	clearScreen()
+	defer waitForEnter()
+	fmt.Println("=== Password Statistics ===")
+	stats := pm.GetPasswordStats()
+	total, ok1 := stats["totalPasswords"].(int)
+	categories, ok2 := stats["categories"].([]string)
+	counts, ok3 := stats["categoryCounts"].(map[string]int)
+	newest, ok4 := stats["newestPassword"].(time.Time)
+	oldest, ok5 := stats["oldestPassword"].(time.Time)
+
+	if !ok1 || !ok2 || !ok3 || !ok4 || !ok5 {
+		showError("Failed to read statistics")
+		return
+	}
+	if total == 0 {
+		showInfo("No passwords saved yet")
+		return
+	}
+	fmt.Println("Total passwords: " + strconv.Itoa(total))
+	fmt.Println("Categories: " + strconv.Itoa(len(categories)))
+	for _, category := range categories {
+		if category == "" {
+			fmt.Println("- (no category): " + strconv.Itoa(counts[category]))
+			continue
+		}
+		fmt.Println("- " + category + ": " + strconv.Itoa(counts[category]))
+	}
+	fmt.Println("Newest password: " + newest.Format("2006-01-02 15:04:05"))
+	fmt.Println("Oldest password: " + oldest.Format("2006-01-02 15:04:05"))
+}
+
+func HandleDuplicatePasswords(pm *PasswordManager) {
+	clearScreen()
+	defer waitForEnter()
+	fmt.Println("=== Duplicate Passwords ===")
+	duplicates := pm.FindDuplicatePasswords()
+	if len(duplicates) == 0 {
+		showSuccess("No duplicate passwords found")
+		return
+	}
+	showInfo(fmt.Sprintf("Found %d groups of services sharing the same password", len(duplicates)))
+	for _, services := range duplicates {
+		sort.Strings(services)
+		fmt.Println("- " + strings.Join(services, ", "))
+	}
+	showInfo("Use unique passwords for each service")
+}
+
 func main() {
+	clearScreen()
+	fmt.Println("=== Password Manager Initialization ===")
+	pm := NewPasswordManager("passwords.dat")
+
+	fmt.Print("Enter master password: ")
+	password, err := readPassword()
+	if err != nil {
+		showError("Error reading password")
+		return
+	}
+
+	err = pm.SetMasterPassword(password)
+	if err != nil {
+		if errors.Is(err, ErrWeakPassword) {
+			showError("Master password is too weak (min 8 chars)")
+		} else {
+			showError("Failed to set master password")
+		}
+		return
+	}
+
+	err = pm.LoadFromFile()
+	if err != nil {
+		if errors.Is(err, os.ErrNotExist) {
+			showInfo("No saved passwords found, starting with an empty vault")
+		} else {
+			showError("Error loading data: " + err.Error())
+			return
+		}
+	}
+	showSuccess("Password manager initialized successfully")
+	waitForEnter()
+
+	for {
+		ShowMainMenu()
+		choice := ReadUserInput("Enter your choice: ")
+		switch choice {
+		case "0":
+			err = HandleExitAndSave(pm)
+			if err != nil {
+				os.Exit(1)
+			}
+			return
+		case "1":
+			HandlePasswordGeneration(pm)
+		case "2":
+			HandlePasswordAdd(pm)
+		case "3":
+			HandlePasswordSearch(pm)
+		case "4":
+			HandlePasswordList(pm)
+		case "5":
+			HandlePasswordUpdate(pm)
+		case "6":
+			HandlePasswordDelete(pm)
+		case "7":
+			HandleCategoryList(pm)
+		case "8":
+			HandlePasswordStats(pm)
+		case "9":
+			HandleDuplicatePasswords(pm)
+		default:
+			showError("Invalid choice")
+			waitForEnter()
+		}
+
+	}
 
 }
