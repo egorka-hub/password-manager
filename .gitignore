@@ -1,9 +1,22 @@
 # Скомпилированные бинарники
+/password-manager
+/bin/
 *.exe
+*.exe~
 *.dll
-password-manager
+*.so
+*.dylib
 
-# Логи и тестовые данные организатора
+# Тесты и профилирование
+*.test
+*.out
+coverage.*
+
+# Рабочие файлы Go
+go.work
+go.work.sum
+
+# Логи и тестовые данные
 *.log
 test_files/
 

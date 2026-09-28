@@ -1,3 +1,5 @@
+// Command password-manager is a console password manager that keeps
+// credentials in a local file encrypted with AES-256-GCM.
 package main
 
 import (
@@ -33,6 +35,7 @@ const (
 	colorReset  = "\033[0m"
 )
 
+// Errors returned by PasswordManager methods.
 var (
 	ErrNotInitialized   = errors.New("password manager not initialized")
 	ErrPasswordExists   = errors.New("password already exists")
@@ -40,6 +43,7 @@ var (
 	ErrWeakPassword     = errors.New("password is too weak")
 )
 
+// Password is a single stored credential.
 type Password struct {
 	Name         string    `json:"name"`
 	Value        string    `json:"value"`
@@ -48,6 +52,8 @@ type Password struct {
 	LastModified time.Time `json:"last_modified"`
 }
 
+// PasswordManager keeps passwords in memory and persists them to an
+// encrypted file. It must be unlocked with SetMasterPassword before use.
 type PasswordManager struct {
 	passwords     map[string]Password
 	masterKey     []byte
@@ -55,6 +61,7 @@ type PasswordManager struct {
 	isInitialized bool
 }
 
+// NewPassword creates a Password with CreatedAt and LastModified set to now.
 func NewPassword(name, value, category string) Password {
 	return Password{
 		Name:         name,
@@ -65,6 +72,7 @@ func NewPassword(name, value, category string) Password {
 	}
 }
 
+// NewPasswordManager returns an empty, locked manager bound to filePath.
 func NewPasswordManager(filePath string) *PasswordManager {
 	return &PasswordManager{
 		passwords:     make(map[string]Password),
@@ -73,6 +81,9 @@ func NewPasswordManager(filePath string) *PasswordManager {
 	}
 }
 
+// SetMasterPassword derives the encryption key from masterPassword and
+// unlocks the manager. It returns ErrWeakPassword if the password is
+// shorter than 8 characters.
 func (pm *PasswordManager) SetMasterPassword(masterPassword string) error {
 	if len(masterPassword) < 8 {
 		return ErrWeakPassword
@@ -85,6 +96,8 @@ func (pm *PasswordManager) SetMasterPassword(masterPassword string) error {
 	return nil
 }
 
+// SavePassword adds a new password. It returns ErrPasswordExists if a
+// password with the same name is already stored.
 func (pm *PasswordManager) SavePassword(name, value, category string) error {
 	if !pm.isInitialized {
 		return ErrNotInitialized
@@ -99,6 +112,8 @@ func (pm *PasswordManager) SavePassword(name, value, category string) error {
 	return nil
 }
 
+// GetPassword returns the password stored under name, or
+// ErrPasswordNotFound if there is none.
 func (pm *PasswordManager) GetPassword(name string) (Password, error) {
 	if !pm.isInitialized {
 		return Password{}, ErrNotInitialized
@@ -109,6 +124,7 @@ func (pm *PasswordManager) GetPassword(name string) (Password, error) {
 	return pm.passwords[name], nil
 }
 
+// ListPasswords returns all stored passwords in no particular order.
 func (pm *PasswordManager) ListPasswords() []Password {
 	pw := make([]Password, 0, len(pm.passwords))
 
@@ -119,6 +135,9 @@ func (pm *PasswordManager) ListPasswords() []Password {
 	return pw
 }
 
+// GeneratePassword returns a random password of the given length built
+// from upper- and lowercase letters, digits and special characters.
+// It returns ErrWeakPassword if length is less than 8.
 func (pm *PasswordManager) GeneratePassword(length int) (string, error) {
 	if length < 8 {
 		return "", ErrWeakPassword
@@ -137,6 +156,8 @@ func (pm *PasswordManager) GeneratePassword(length int) (string, error) {
 	return string(result), nil
 }
 
+// SaveToFile encrypts all passwords with AES-256-GCM and writes them to
+// the manager's file as nonce followed by ciphertext.
 func (pm *PasswordManager) SaveToFile() error {
 	if !pm.isInitialized {
 		return ErrNotInitialized
@@ -181,6 +202,8 @@ func (pm *PasswordManager) SaveToFile() error {
 	return nil
 }
 
+// LoadFromFile reads and decrypts the manager's file. If the file does
+// not exist, the returned error wraps os.ErrNotExist.
 func (pm *PasswordManager) LoadFromFile() error {
 	if !pm.isInitialized {
 		return ErrNotInitialized
@@ -225,6 +248,9 @@ func (pm *PasswordManager) LoadFromFile() error {
 	return nil
 }
 
+// CheckPasswordStrength returns ErrWeakPassword unless password has at
+// least 8 characters and contains an uppercase letter, a lowercase
+// letter, a digit and a special character.
 func (pm *PasswordManager) CheckPasswordStrength(password string) error {
 	if len(password) < 8 {
 		return ErrWeakPassword
@@ -251,6 +277,8 @@ func (pm *PasswordManager) CheckPasswordStrength(password string) error {
 	return nil
 }
 
+// GetPasswordsByCategory returns passwords whose category matches
+// category, ignoring case.
 func (pm *PasswordManager) GetPasswordsByCategory(category string) []Password {
 	passwords := make([]Password, 0)
 	for _, password := range pm.passwords {
@@ -262,6 +290,9 @@ func (pm *PasswordManager) GetPasswordsByCategory(category string) []Password {
 	return passwords
 }
 
+// FindDuplicatePasswords groups service names that share the same
+// password value. The map is keyed by the password value itself, so keys
+// must not be displayed.
 func (pm *PasswordManager) FindDuplicatePasswords() map[string][]string {
 	byValue := make(map[string][]string)
 	for _, password := range pm.passwords {
@@ -277,6 +308,8 @@ func (pm *PasswordManager) FindDuplicatePasswords() map[string][]string {
 	return byValue
 }
 
+// UpdatePassword replaces the value of an existing password after
+// checking its strength with CheckPasswordStrength.
 func (pm *PasswordManager) UpdatePassword(name, newValue string) error {
 	if !pm.isInitialized {
 		return ErrNotInitialized
@@ -298,6 +331,7 @@ func (pm *PasswordManager) UpdatePassword(name, newValue string) error {
 	return nil
 }
 
+// DeletePassword removes the password stored under name.
 func (pm *PasswordManager) DeletePassword(name string) error {
 	if !pm.isInitialized {
 		return ErrNotInitialized
@@ -312,6 +346,8 @@ func (pm *PasswordManager) DeletePassword(name string) error {
 	return nil
 }
 
+// ListCategories returns the unique categories in lowercase, sorted
+// alphabetically.
 func (pm *PasswordManager) ListCategories() []string {
 	unique := make(map[string]bool)
 	for _, p := range pm.passwords {
@@ -328,6 +364,9 @@ func (pm *PasswordManager) ListCategories() []string {
 	return categories
 }
 
+// GetPasswordStats returns totalPasswords (int), categories ([]string),
+// categoryCounts (map[string]int), newestPassword and oldestPassword
+// (time.Time).
 func (pm *PasswordManager) GetPasswordStats() map[string]any {
 	var newest, oldest time.Time
 	categoryCounts := make(map[string]int)
@@ -375,6 +414,8 @@ func waitForEnter() {
 	_, _ = reader.ReadString('\n')
 }
 
+// ReadUserInput prints prompt and returns one line of input without
+// surrounding whitespace.
 func ReadUserInput(prompt string) string {
 	fmt.Print(prompt)
 	r := bufio.NewReader(os.Stdin)
@@ -397,6 +438,7 @@ func readPassword() (string, error) {
 	return result, nil
 }
 
+// ShowMainMenu clears the screen and prints the main menu.
 func ShowMainMenu() {
 	clearScreen()
 	separator := strings.Repeat("=", 42)
@@ -417,6 +459,7 @@ func ShowMainMenu() {
 	fmt.Println()
 }
 
+// PrintPasswordList prints passwords as a table without their values.
 func PrintPasswordList(passwords []Password) {
 	format := "%-20s %-15s %-19s %s\n"
 	separator := strings.Repeat("-", 80)
@@ -432,6 +475,7 @@ func PrintPasswordList(passwords []Password) {
 	fmt.Println()
 }
 
+// ShowPasswordDetails prints all fields of password, including its value.
 func ShowPasswordDetails(password Password) {
 	fmt.Println("=== Password Details ===")
 	fmt.Printf("Service: %s\n", password.Name)
@@ -441,6 +485,7 @@ func ShowPasswordDetails(password Password) {
 	fmt.Printf("Last Modified: %s\n", password.LastModified.Format("2006-01-02 15:04:05"))
 }
 
+// HandlePasswordGeneration asks for a length and prints a generated password.
 func HandlePasswordGeneration(pm *PasswordManager) error {
 	clearScreen()
 	defer waitForEnter()
@@ -465,6 +510,8 @@ func HandlePasswordGeneration(pm *PasswordManager) error {
 	return nil
 }
 
+// HandlePasswordAdd asks for a service, password and category and saves
+// them. An empty password is replaced with a generated one.
 func HandlePasswordAdd(pm *PasswordManager) error {
 	clearScreen()
 	defer waitForEnter()
@@ -506,6 +553,7 @@ func HandlePasswordAdd(pm *PasswordManager) error {
 	return nil
 }
 
+// HandlePasswordSearch asks for a service name and shows its details.
 func HandlePasswordSearch(pm *PasswordManager) error {
 	clearScreen()
 	defer waitForEnter()
@@ -530,6 +578,9 @@ func HandlePasswordSearch(pm *PasswordManager) error {
 	ShowPasswordDetails(password)
 	return nil
 }
+
+// HandlePasswordUpdate asks for a service name and a new password and
+// updates it.
 func HandlePasswordUpdate(pm *PasswordManager) error {
 	clearScreen()
 	defer waitForEnter()
@@ -562,6 +613,7 @@ func HandlePasswordUpdate(pm *PasswordManager) error {
 	return nil
 }
 
+// HandleExitAndSave saves all passwords to the file before exit.
 func HandleExitAndSave(pm *PasswordManager) error {
 	clearScreen()
 	fmt.Println("=== Saving and Exiting ===")
@@ -577,6 +629,7 @@ func HandleExitAndSave(pm *PasswordManager) error {
 	return nil
 }
 
+// HandlePasswordList prints all passwords sorted by name.
 func HandlePasswordList(pm *PasswordManager) {
 	clearScreen()
 	defer waitForEnter()
@@ -591,6 +644,8 @@ func HandlePasswordList(pm *PasswordManager) {
 	PrintPasswordList(passwords)
 }
 
+// HandlePasswordDelete asks for a service name and deletes it after
+// confirmation.
 func HandlePasswordDelete(pm *PasswordManager) {
 	clearScreen()
 	defer waitForEnter()
@@ -622,6 +677,7 @@ func HandlePasswordDelete(pm *PasswordManager) {
 	showSuccess("Password deleted successfully!")
 }
 
+// HandleCategoryList prints all categories.
 func HandleCategoryList(pm *PasswordManager) {
 	clearScreen()
 	defer waitForEnter()
@@ -640,6 +696,8 @@ func HandleCategoryList(pm *PasswordManager) {
 	}
 }
 
+// HandlePasswordStats prints password counts per category and the
+// creation dates of the newest and oldest passwords.
 func HandlePasswordStats(pm *PasswordManager) {
 	clearScreen()
 	defer waitForEnter()
@@ -672,6 +730,8 @@ func HandlePasswordStats(pm *PasswordManager) {
 	fmt.Println("Oldest password: " + oldest.Format("2006-01-02 15:04:05"))
 }
 
+// HandleDuplicatePasswords prints groups of services that share the same
+// password without revealing the password.
 func HandleDuplicatePasswords(pm *PasswordManager) {
 	clearScreen()
 	defer waitForEnter()

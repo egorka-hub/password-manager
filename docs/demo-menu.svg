@@ -1,0 +1,32 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="585" height="484" viewBox="0 0 585 484">
+<rect width="585" height="484" rx="10" fill="#1e2127"/>
+<rect width="585" height="30" rx="10" fill="#2c313a"/>
+<rect y="20" width="585" height="10" fill="#2c313a"/>
+<circle cx="18" cy="15" r="6" fill="#f25c54"/>
+<circle cx="38" cy="15" r="6" fill="#e5c07b"/>
+<circle cx="58" cy="15" r="6" fill="#4ec96b"/>
+<text x="292.5" y="20" fill="#8b93a1" font-family="Menlo, Consolas, monospace" font-size="12" text-anchor="middle">password-manager</text>
+<g font-family="Menlo, Consolas, 'DejaVu Sans Mono', monospace" font-size="14" xml:space="preserve">
+<text x="20" y="60" fill="#8b93a1">$ ./password-manager</text>
+<text x="20" y="80" fill="#d7dae0">=== Password Manager Initialization ===</text>
+<text x="20" y="100" fill="#d7dae0">Enter master password:</text>
+<text x="20" y="120" fill="#e5c07b">→ Info: No saved passwords found, starting with an empty vault</text>
+<text x="20" y="140" fill="#4ec96b">✓ Success: Password manager initialized successfully</text>
+<text x="20" y="160" fill="#d7dae0"></text>
+<text x="20" y="180" fill="#d7dae0">==========================================</text>
+<text x="20" y="200" fill="#d7dae0">             Password Manager</text>
+<text x="20" y="220" fill="#d7dae0">==========================================</text>
+<text x="20" y="240" fill="#d7dae0">1. Generate new password</text>
+<text x="20" y="260" fill="#d7dae0">2. Add new password</text>
+<text x="20" y="280" fill="#d7dae0">3. Get password</text>
+<text x="20" y="300" fill="#d7dae0">4. List all passwords</text>
+<text x="20" y="320" fill="#d7dae0">5. Update password</text>
+<text x="20" y="340" fill="#d7dae0">6. Delete password</text>
+<text x="20" y="360" fill="#d7dae0">7. List categories</text>
+<text x="20" y="380" fill="#d7dae0">8. Show password statistics</text>
+<text x="20" y="400" fill="#d7dae0">9. Find duplicate passwords</text>
+<text x="20" y="420" fill="#d7dae0">0. Exit</text>
+<text x="20" y="440" fill="#d7dae0">==========================================</text>
+<text x="20" y="460" fill="#d7dae0">Enter your choice: 2</text>
+</g>
+</svg>
